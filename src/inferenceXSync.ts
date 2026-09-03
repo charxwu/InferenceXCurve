@@ -691,7 +691,7 @@ function benchmarkRecordToPoint(
     throughput,
     precision: config.precision.toLowerCase(),
     strategy: makeStrategyLabel(decodeTp, decodeEp, decodeDcp ?? prefillDcp),
-    tp: totalGpu ?? decodeTp ?? undefined,
+    tp: decodeTp ?? prefillTp ?? totalGpu ?? undefined,
     disagg,
     concurrency: readNumber(record, 'conc') ?? undefined,
     label: makePointLabel(readString(record, 'date'), readString(record, 'run_url'), offload.label)

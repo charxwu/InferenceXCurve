@@ -1838,7 +1838,12 @@ function updatePointLabel(
 }
 
 function getReferenceTp(point: ChartPoint): number | undefined {
-  return getInferenceCurvePointGpuCount(point);
+  return (
+    readFiniteNumber(point.decode_tp) ??
+    readFiniteNumber(point.tp) ??
+    readFiniteNumber(point.prefill_tp) ??
+    getInferenceCurvePointGpuCount(point)
+  );
 }
 
 function getAdvancedPointLabel(point: ChartPoint): string {
@@ -1910,11 +1915,14 @@ function getAdvancedPointLabel(point: ChartPoint): string {
     return `${prefillWorkers ?? 1}x${prefillLabel}+${decodeWorkers ?? 1}x${decodeLabel}`;
   }
 
+  const aggregateTp = decodeTp ?? tp;
+  const aggregateEp = decodeEp ?? ep;
+  const aggregateDpAttention = decodeDpAttention ?? dpAttention;
   if (
-    tp !== undefined &&
-    (ep !== undefined || dpAttention !== undefined || commonDcp !== undefined)
+    aggregateTp !== undefined &&
+    (aggregateEp !== undefined || aggregateDpAttention !== undefined || commonDcp !== undefined)
   ) {
-    return configSegmentLabel(tp, ep, dpAttention, commonDcp);
+    return configSegmentLabel(aggregateTp, aggregateEp, aggregateDpAttention, commonDcp);
   }
 
   const referenceTp = getReferenceTp(point);

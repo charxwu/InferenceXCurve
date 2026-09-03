@@ -4312,7 +4312,11 @@ function draftsToSeriesInternal(drafts: SeriesDraft[]): InferenceCurveSeries[] {
           point.theoretical_cache_hit_rate = theoreticalCacheHitRate;
         }
         point.tp =
-          getInferenceCurvePointGpuCount(point) ?? parseNumber(row.tp) ?? decodeTp ?? undefined;
+          decodeTp ??
+          prefillTp ??
+          parseNumber(row.tp) ??
+          getInferenceCurvePointGpuCount(point) ??
+          undefined;
         point.strategy =
           (row.strategy ?? '').trim() || makeStrategyLabel(decodeTp, decodeEp, decodeDcp ?? prefillDcp);
         return point;
@@ -7066,7 +7070,7 @@ function importedPointFromBenchmarkRecord(
     throughput,
     precision,
     strategy: makeStrategyLabel(decodeTp, decodeEp, decodeDcp ?? prefillDcp),
-    tp: totalGpu ?? decodeTp ?? undefined,
+    tp: decodeTp ?? prefillTp ?? totalGpu ?? undefined,
     disagg,
     concurrency: concurrency ?? undefined,
     label: makeImportedPointLabel(
