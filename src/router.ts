@@ -8,6 +8,17 @@ if (!app) throw new Error('Missing #app root');
 
 app.innerHTML = `
   <header class="workspace-header no-export">
+    <div class="workspace-attribution">
+      Modified fork by
+      <a href="https://github.com/charxwu/InferenceXCurve" target="_blank" rel="noreferrer">charxwu</a>
+      · Original by
+      <a
+        class="original-author-link"
+        href="https://github.com/Duyi-Wang/InferenceXCurve"
+        target="_blank"
+        rel="noreferrer"
+      >Duyi-Wang</a>
+    </div>
     <nav class="workspace-tabs" aria-label="Workspace">
       <a class="workspace-tab" href="#/inferencex" data-workspace="inferencex">InferenceX Curve</a>
       <a class="workspace-tab" href="#/plot-tool" data-workspace="plot-tool">Plot Tool</a>
