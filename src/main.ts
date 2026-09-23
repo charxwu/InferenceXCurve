@@ -299,6 +299,7 @@ const DEFAULT_PRECISION = 'default';
 const DEFAULT_LINE_STYLE = 'solid';
 const LOCAL_STORAGE_KEY = 'inferencex-curve:user-data:v1';
 const TOKEN_STORAGE_KEY = 'inferencex-curve:github-token:v1';
+const LEGACY_DEFAULT_CHART_WATERMARK = 'MORI Internal';
 const LOCAL_SAVE_DEBOUNCE_MS = 350;
 const AUTO_RENDER_DEBOUNCE_MS = 400;
 const MAX_WATERMARK_LENGTH = 64;
@@ -818,7 +819,10 @@ function restoreAppState(defaults: AppState, saved: PersistedAppState, series: I
     highContrast: saved.highContrast ?? defaults.highContrast,
     logY: saved.logY ?? defaults.logY,
     search: saved.search ?? defaults.search,
-    watermark: saved.watermark ?? defaults.watermark
+    watermark:
+      saved.watermark === undefined || saved.watermark === LEGACY_DEFAULT_CHART_WATERMARK
+        ? defaults.watermark
+        : saved.watermark
   };
 }
 
@@ -1195,9 +1199,14 @@ app.innerHTML = `
                   </span>
                 </span>
               </button>
-              <button id="merge-lines" class="action-button" type="button">
+              <button
+                id="merge-lines"
+                class="action-button"
+                type="button"
+                title="Merge point data from lines with the same Name and different Line IDs"
+              >
                 ${renderIcon('merge')}
-                <span>Merge Lines</span>
+                <span>Merge Same Name</span>
               </button>
             </div>
             <input
@@ -5354,16 +5363,16 @@ function openMergePreview(): void {
   pendingMergeGroups = buildPendingMergeGroups();
   renderMergePreview();
   if (pendingMergeGroups.length === 0) {
-    setStatus('No merge candidates in the current filtered line list.', true);
+    setStatus('No lines with the same Name and different Line IDs were found in the current filtered list.', true);
     return;
   }
-  setStatus(`Found ${pendingMergeGroups.length} merge candidate groups. Select the exact lines to merge.`);
+  setStatus(`Found ${pendingMergeGroups.length} same-Name groups. Select the lines to merge and choose the Main line whose ID and style will be kept.`);
 }
 
 function buildPendingMergeGroups(): PendingMergeGroup[] {
   const groups = new Map<string, PendingMergeGroup>();
   getFilteredDraftEntries()
-    .filter(({ draft }) => countPointRows([draft]) > 0)
+    .filter(({ draft }) => draft.name.trim() && countPointRows([draft]) > 0)
     .forEach(({ draft, index }) => {
       const key = getMergeGroupKey(draft);
       const group =
@@ -5382,7 +5391,9 @@ function buildPendingMergeGroups(): PendingMergeGroup[] {
       groups.set(key, group);
     });
 
-  return Array.from(groups.values()).filter((group) => group.lines.length > 1);
+  return Array.from(groups.values()).filter(
+    (group) => new Set(group.lines.map((line) => line.draftId)).size > 1
+  );
 }
 
 function renderMergePreview(): void {
@@ -5398,13 +5409,13 @@ function renderMergePreview(): void {
     (count, group) => count + group.lines.filter((line) => line.selected).length,
     0
   );
-  const readyGroupCount = pendingMergeGroups.filter((group) => getSelectedMergeLines(group).length >= 2).length;
+  const readyGroupCount = pendingMergeGroups.filter(isMergeGroupReady).length;
   const previewColors = resolveInferenceCurveColors(draftsToPreviewSeries(seriesDrafts), state.highContrast, state.theme);
 
   mergePreviewEl.innerHTML = `
     <div class="merge-preview-head">
       <div>
-        <strong>Review Merge</strong>
+        <strong>Merge Lines with the Same Name</strong>
         <span>${readyGroupCount} ready groups / ${pendingMergeGroups.length} candidates, ${selectedLineCount} selected lines</span>
       </div>
       <div class="merge-preview-actions">
@@ -5537,9 +5548,9 @@ function handleMergePreviewClick(event: MouseEvent): void {
 }
 
 function mergeSelectedLines(): void {
-  const groups = pendingMergeGroups.filter((group) => getSelectedMergeLines(group).length >= 2);
+  const groups = pendingMergeGroups.filter(isMergeGroupReady);
   if (groups.length === 0) {
-    setStatus('Select at least two lines in a candidate group.', true);
+    setStatus('Select at least two lines with the same Name and different Line IDs.', true);
     return;
   }
 
@@ -5593,6 +5604,11 @@ function getSelectedMergeLines(group: PendingMergeGroup): PendingMergeLine[] {
   return group.lines.filter((line) => line.selected);
 }
 
+function isMergeGroupReady(group: PendingMergeGroup): boolean {
+  const selectedLines = getSelectedMergeLines(group);
+  return selectedLines.length >= 2 && new Set(selectedLines.map((line) => line.draftId)).size >= 2;
+}
+
 function getMainMergeLine(lines: PendingMergeLine[]): PendingMergeLine {
   return (
     lines.find((line) => line.main) ??
@@ -5606,10 +5622,13 @@ function getMainMergeLine(lines: PendingMergeLine[]): PendingMergeLine {
 }
 
 function validateMergeGroup(group: PendingMergeGroup, lines: PendingMergeLine[]): boolean {
-  return lines.every((line) => {
-    const draft = seriesDrafts[line.draftIndex];
-    return draft && getDraftSeriesId(draft, line.draftIndex) === line.draftId && getMergeGroupKey(draft) === group.key;
-  });
+  return (
+    new Set(lines.map((line) => line.draftId)).size >= 2 &&
+    lines.every((line) => {
+      const draft = seriesDrafts[line.draftIndex];
+      return draft && getDraftSeriesId(draft, line.draftIndex) === line.draftId && getMergeGroupKey(draft) === group.key;
+    })
+  );
 }
 
 function comparePointRowsForMerge(a: PointRow, b: PointRow): number {
@@ -5640,30 +5659,15 @@ function clearMergePreview(): void {
 }
 
 function getMergeGroupKey(draft: SeriesDraft): string {
-  return [
-    normalizeMergeKeyPart(getDraftModel(draft)),
-    normalizeMergeIslOsl(getDraftIslOsl(draft)),
-    normalizeMergeKeyPart(getDraftPrecision(draft)),
-    getDraftMtpFilter(draft)
-  ].join('|');
+  return draft.name.trim();
 }
 
 function getMergeGroupLabel(draft: SeriesDraft): string {
-  return [
-    getDraftModel(draft),
-    formatPrecisionLabel(getDraftPrecision(draft)),
-    formatIslOslLabel(getDraftIslOsl(draft)),
-    formatMtpFilterLabel(getDraftMtpFilter(draft))
-  ].join(' • ');
+  return `Name: ${draft.name.trim()}`;
 }
 
 function normalizeMergeKeyPart(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/gu, ' ');
-}
-
-function normalizeMergeIslOsl(value: string): string {
-  const lengths = parseIslOslLengths(value);
-  return lengths ? `${lengths.isl}/${lengths.osl}` : normalizeMergeKeyPart(value);
 }
 
 function createImportBatchSettings(runId = ''): ImportBatchSettings {

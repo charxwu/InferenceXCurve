@@ -215,7 +215,7 @@ const CHART_MARGIN = { top: 18, right: 24, bottom: 48, left: 82 };
 // Exposed so the PNG export can align overlays (e.g. the legend) to the plot
 // area rather than the full chart SVG bounds.
 export const INFERENCE_CURVE_MARGIN = CHART_MARGIN;
-export const DEFAULT_CHART_WATERMARK = 'MORI Internal';
+export const DEFAULT_CHART_WATERMARK = 'AIM Internal';
 
 type Vendor = 'nvidia' | 'amd' | 'unknown';
 
